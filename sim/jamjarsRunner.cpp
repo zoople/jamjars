@@ -12,7 +12,7 @@ class Rng {
 	unsigned long long nextSeed;
 
 	public:
-		void setSeed(int seed) {initialSeed = seed; nextSeed = 1;}
+		void setSeed(int seed) {initialSeed = seed; nextSeed = seed;}
 	unsigned long long generateNext() { 
 		int skip = -1;
 		if (nextSeed == 1) skip = 1; else skip = 0;
@@ -20,8 +20,10 @@ class Rng {
 		for (int times = 0; times<1+skip; times++) nextSeed = ( nextSeed * 654188429 ) % 899809343;}
 	//	unsigned long long generateNext() { nextSeed = ( nextSeed * 5 ) % 11;}
 		
-		unsigned long long getNext() { return nextSeed;}
+		unsigned long long getNext() {  return nextSeed;}
 		int getNext(int mod) { return nextSeed % mod;}
+		int getSeed() { return initialSeed;}
+
 
 
 } ;
@@ -99,7 +101,7 @@ int checkSquare(int (*gameBoard)[NUMCOLS], int (*markBoard)[NUMCOLS], int x, int
 	return found;
 }
 
-int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS] )
+int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng *tileRng )
 {
 	int spotsToFill[NUMCOLS] = {0};
 
@@ -122,8 +124,10 @@ int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS] )
 		}
 
 		
-		for (col = NUMCOLS-1; col > NUMCOLS-spotsToFill[row] -1; col--) {	
-			gameBoard[row][col] = 0; //TODO NEXT - Populate
+		for (col = NUMCOLS-1; col > NUMCOLS-spotsToFill[row] -1; col--) 
+		{	
+			tileRng->generateNext();
+			gameBoard[row][col] = 1+ tileRng->getNext(NUMSYMBOLS); //TODO NEXT - Populate
 		}
 
 	}
@@ -138,7 +142,7 @@ int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS] )
 	return 0;
 }
 
-int checkGame(int (*gameBoard)[NUMCOLS])
+int checkGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 {
 	int markBoard[NUMROWS][NUMCOLS] = {{0}};
 	int clearBoard[NUMROWS][NUMCOLS] = {{0}};
@@ -181,7 +185,7 @@ int checkGame(int (*gameBoard)[NUMCOLS])
 
 	printBoard(clearBoard);
 
-	deleteAndPopulate(gameBoard, clearBoard);
+	deleteAndPopulate(gameBoard, clearBoard, tileRng);
 
 	printBoard(gameBoard);
 	
@@ -190,21 +194,23 @@ int checkGame(int (*gameBoard)[NUMCOLS])
 
 
 
-int createGame(int (*gameBoard)[NUMCOLS], int seed)
+int createGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 {
 	int row,col =0;
-
-	Rng tileRng;
-	tileRng.setSeed(seed);
+	printf("Seed: %i\n", tileRng->getSeed());
+	int tile = 0;
+	int rngResult = 0;
 
 	for (row = 0; row<NUMROWS; row++)
 	{
 		for (col = 0; col<NUMCOLS; col++)
 		{
-			tileRng.generateNext();
+			tileRng->generateNext();
+			rngResult = tileRng->getNext();
+			tile = 1+ tileRng->getNext(NUMSYMBOLS);
 
-
-			gameBoard[row][col] = 1+ tileRng.getNext(NUMSYMBOLS);
+			gameBoard[row][col] = tile;
+			//printf("%i  > %i.\n", rngResult, tile);
 
 		}
 	}
@@ -214,10 +220,12 @@ int createGame(int (*gameBoard)[NUMCOLS], int seed)
 int main()
 {
 	int gameBoard[NUMROWS][NUMCOLS] = {0};
+	Rng tileRng;
+	tileRng.setSeed(10);
 
-	createGame(gameBoard, 1);
+	createGame(gameBoard, &tileRng );
 	printBoard(gameBoard);
-	checkGame(gameBoard);
+	checkGame(gameBoard, &tileRng);
 
 
 
