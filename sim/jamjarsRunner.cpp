@@ -4,8 +4,10 @@
 
 #define NUMROWS 5
 #define NUMCOLS 5
-#define NUMSYMBOLS 3
+#define NUMSYMBOLS 6
 #define MINCLUSTERLENGTH 3
+
+#include "jamjarsPaytable.h"
 
 class Rng {
 	unsigned long long initialSeed;
@@ -152,6 +154,7 @@ int checkGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 	int winStarts[NUMCOLS*NUMROWS][2] = {{0}};
 	int numWins = 0;
 
+	int wins = 0;
 
 	//Check all squares
 	for (int x=0; x<NUMCOLS; x++)
@@ -167,6 +170,8 @@ int checkGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 				 winStarts[numWins][1] = y; 
 				printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
 				 numWins++;
+				 wins += paytable[gameBoard[x][y]][0];
+
 				
 			}
 		} else printf("(%i, %i), Skipped\n");  //don't check the square if it was already looked at
@@ -188,6 +193,8 @@ int checkGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 	deleteAndPopulate(gameBoard, clearBoard, tileRng);
 
 	printBoard(gameBoard);
+
+	return wins;
 	
 }
 
@@ -222,11 +229,17 @@ int main()
 	int gameBoard[NUMROWS][NUMCOLS] = {0};
 	Rng tileRng;
 	tileRng.setSeed(10);
+	int numWins = 0;
 
 	createGame(gameBoard, &tileRng );
 	printBoard(gameBoard);
-	checkGame(gameBoard, &tileRng);
 
+	numWins=1;
+	while (numWins>0)
+	{
+		numWins = checkGame(gameBoard, &tileRng);
+		printf ("%i wins\n", numWins);
+	}
 
 
 }
