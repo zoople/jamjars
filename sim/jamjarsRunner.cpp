@@ -427,8 +427,8 @@ int checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng
 				 winStarts[numWins][1] = y; 
 				printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
 				 numWins++; 
-				 wins += paytable[gameBoard[x][y]][0]; //award the win
-				 printf ("PAY OF %i \n", paytable[gameBoard[x][y]][0]);
+				 wins += paytable[gameBoard[x][y]][clusterLength]; //award the win
+				 printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
 
 				
 			}
@@ -533,6 +533,8 @@ int main()
 	int jam[7] = {0};
 	int jamTriggerSwitch[7] = {0};
 	//I int jamTriggers[7] = {0, 20, 20, 20, 20, 20, 20};
+	int jamCheck = 0;
+	int featureChoice = 0;
 
 	createGame(gameBoard, &tileRng );
 	printBoard(gameBoard);
@@ -544,12 +546,22 @@ int main()
 	{
 		int wins;
 		int drops;
+		int totalWins;
+		int totalDrops;
 	} data;
 
 
 	data.wins = 0;
 	data.drops = 0;
+	data.totalWins = 0;
+	data.totalDrops = 0;
 
+	int gameOver = 0;
+
+	jam[2] +=100;
+	
+	while (!gameOver)
+	{
 	numWins=-1; 
 	while (numWins>0 || numWins == -1)
 	{
@@ -567,22 +579,46 @@ int main()
 
 	}
 
-	printf ("...................................End of game. Won %i in %i drops\n", data.wins, data.drops);
+	data.totalWins += data.wins;
+	data.totalDrops += data.drops;
 
-	printf("Adding this feature\n");
+	printf ("...................................End of this set of drops. Won %i in %i drops\n", data.wins, data.drops);
 
-	for(int i=0; i<7; i++) jamTriggerSwitch[i] = 0;
+	data.wins = 0;
+	data.drops = 0;
+	
+	jamCheck = 6;
+	featureChoice = FEATURE_FRUITBURST; //TO DO - ADD SELECTION
 
-	jamTriggerSwitch[0]= 1;
-	jamTriggerSwitch[2]= 1;
-	jamTriggerSwitch[3]= 1;
 
-	applyFeature(  gameBoard, FEATURE_FRUITBURST, 2, &tileRng);
+	if (jamTriggerSwitch[0] > 0)
+	{
+		printf("There was a jam trigger!\n");
+		while (jamCheck>0)
+		{
+			printf("Was it %i? \n", jamCheck);
+			if (jamTriggerSwitch[jamCheck] > 0) 
+			{
+				jamTriggerSwitch[jamCheck]--;
 
+				applyFeature(  gameBoard, featureChoice, jamCheck, &tileRng);
+
+				jamCheck = 0; 
+
+			} else	jamCheck--;
+		}
+
+		jamTriggerSwitch[0]--;
+	} else gameOver = 1;
+
+
+
+	}
 	//numWins = checkGame(FEATURE_INSEASON, gameBoard, jam, jamTriggerSwitch, &tileRng);
 
 	//need to keep going, but remember that you can't call the feature again or it will do its thing, you need to check the rest of the game as if its a normal game after this. 
 
+printf ("...................................End of game. Won %i in %i drops\n", data.totalWins, data.totalDrops);
 
 
 
