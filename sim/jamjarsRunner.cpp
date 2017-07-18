@@ -157,13 +157,14 @@ int checkSquare(int (*gameBoard)[NUMCOLS], int (*markBoard)[NUMCOLS], int x, int
 	Deletes any symbols marked, drops the remaining symbols, then fills it with new ones
 
 */
-int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng *tileRng )
+int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng *tileRng, int * js)
 {
 	int spotsToFill[NUMCOLS] = {0};
 
 
 	int row = 0;
 	int col =0;
+		int j;
 
 	for (row = 0; row<NUMROWS;  row++)
 	{
@@ -183,7 +184,13 @@ int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng
 		for (col = NUMCOLS-1; col > NUMCOLS-spotsToFill[row] -1; col--) 
 		{	
 			tileRng->generateNext();
-			gameBoard[row][col] = 1+ tileRng->getNext(NUMSYMBOLS); 
+
+			if (js[0] == 0) gameBoard[row][col] = 1+ tileRng->getNext(NUMSYMBOLS); 
+			else {
+					j = 1+ tileRng->getNext(NUMSYMBOLS);
+					 gameBoard[row][col] = js[j-1];
+
+			}
 		}
 
 	}
@@ -214,6 +221,8 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 {
 	printf("FEATURE CALL. FEATURE %i FOR JAM %i \n", featureType, featureFruit);
 	int clearBoard[NUMROWS][NUMCOLS] = {{0}};
+
+	int jamSwitcher[6] = {0};
 
 	if (featureType == FEATURE_INSEASON)
 	{
@@ -305,7 +314,7 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 			}
 
 			printBoard(clearBoard);
-			deleteAndPopulate(gameBoard, clearBoard, tileRng);
+			deleteAndPopulate(gameBoard, clearBoard, tileRng, jamSwitcher	);
 			printBoard(gameBoard);
 
 
@@ -393,7 +402,7 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 
 		//printBoard	(clearBoard	);
 		//printBoard	(gameBoard	);
-		deleteAndPopulate(gameBoard, clearBoard, tileRng);
+		deleteAndPopulate(gameBoard, clearBoard, tileRng, jamSwitcher	);
 		
   // 		//BL - TR diagonal
 		// for (int i=0; i<7; i++) if (gameBoard[6-i][i] == featureFruit) fruitsOnBoard++;
@@ -422,7 +431,7 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 /*
 	Check the array for wins
 */
-void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng *tileRng, gameInfo *info, int (*winRecorder)[16])
+void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng *tileRng, gameInfo *info, int (*winRecorder)[16], int *jamSwitcher)
 {
 
 	int markBoard[NUMROWS][NUMCOLS] = {{0}}; //this is so you know where you have looked
@@ -452,7 +461,7 @@ void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rn
 				//printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
 				 numWins++; 
 				 wins += paytable[gameBoard[x][y]][clusterLength]; //award the win
-				 printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
+				// printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
 				 winRecorder[gameBoard[x][y]][clusterLength]++;
 				
 			}
@@ -470,7 +479,7 @@ void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rn
 
 	//printf("Ready to delete\n");
 	//printBoard(clearBoard);
-	deleteAndPopulate(gameBoard, clearBoard, tileRng);
+	deleteAndPopulate(gameBoard, clearBoard, tileRng, jamSwitcher);
 	//printf("New board:\n");
 	//printBoard(gameBoard);
 
@@ -552,6 +561,53 @@ int shuffleBoard(int (*gameBoard)[NUMCOLS], Rng *tileRng )
 
 }
 
+void changePattern( 	int (*gameBoard)[NUMCOLS], int *jamAssignment  )
+{
+	//printBoard	(gameBoard	);
+
+	//for (int i=0; i<6; i++) printf("%i, ", jamAssignment[i]);
+	//	printf("\n");
+
+
+	for (int x=0; x<7; x++)
+			for (int y=0; y<7; y++) gameBoard[x][y] = jamAssignment[ gameBoard[x][y]-1 ];
+
+
+	//printBoard	(gameBoard	);
+}
+
+void assignJam(int* whichJam)
+{
+	int newWeights[8] = {0};
+	int rngResult = 0;
+
+
+	for (int i=0; i<8; i++) newWeights[i] = jamWeights[i];
+
+//for (int i=0; i<8; i++) printf("%i, ", newWeights[i]);
+		//	printf("\n");
+		
+		//printf("lets begin \n");
+
+	for (int i=0; i<6; i++)
+	{
+		rngResult = weightedDice(newWeights);
+		//printf("I got %i\n", rngResult);
+		whichJam[i] = rngResult+1;
+		newWeights[1]-= newWeights[rngResult+2];
+		newWeights[rngResult+2] = 0;
+
+		//for (int i=0; i<8; i++) printf("%i, ", newWeights[i]);
+		//	printf("\n");
+
+	}
+
+
+	//for (int i=0; i<6; i++) printf("%i, ", whichJam[i]);
+	//printf("\n");
+
+}
+
 int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 {
 	int gameBoard[NUMROWS][NUMCOLS] = {0};
@@ -559,6 +615,7 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	tileRng.setSeed(gameSeed);
 	int numWins = 0;
 
+	int whichJam[6] = {0};
 	int jam[7] = {0};
 	int jamTriggerSwitch[7] = {0};
 	//I int jamTriggers[7] = {0, 20, 20, 20, 20, 20, 20};
@@ -568,7 +625,9 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	createGame(gameBoard, &tileRng );
 	//printBoard(gameBoard);
 
-
+	assignJam(whichJam);
+	changePattern(gameBoard, whichJam		);
+	
 	int state = STATE_BOUGHTGAME;
 
 	
@@ -593,7 +652,7 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 		data->numWins = 0;
 
 		if (numWins == -1) numWins = 0;
-		checkGame(STATE_BOUGHTGAME, gameBoard, jam, jamTriggerSwitch, &tileRng, data, winRecorder);
+		checkGame(STATE_BOUGHTGAME, gameBoard, jam, jamTriggerSwitch, &tileRng, data, winRecorder, whichJam	);
 		//printf ("%i won\n", data->wins);
 		//printf ("%i total number wins\n", data->numWins);
 		
@@ -654,7 +713,7 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	data->totalDrops--;
 
 
-	printf ("...................................End of game. Won %i over %i wins in %i drops\n", data->totalWins, data->totalNumWins, data->totalDrops);
+	//printf ("...................................End of game. Won %i over %i wins in %i drops\n", data->totalWins, data->totalNumWins, data->totalDrops);
 	
 
 }
@@ -791,7 +850,7 @@ void bucketStats()
 
 		gameInfo data;
 	
-	if ((dir = opendir ("output")) != NULL) 
+	if ((dir = opendir ("./output")) != NULL) 
 	{
 	  	/* print all the files and directories within directory */
 	  	while ((ent = readdir (dir)) != NULL) {
@@ -858,6 +917,24 @@ void bucketStats()
 
 								    myfile.close();
 								  }
+								   	printf("Now I need to move it to the buckets folder\n");
+
+								    	std::ifstream  src(filename.c_str(), std::ios::binary);  //already know the source
+
+								      os.str(std::string()); //clear the stream
+									  os << "./buckets/B" << ((ent->d_name[1]-'0'-1)*5+bucketNum+1);
+									  os << "/";
+									  os << subent->d_name;
+									  filename = os.str();
+
+
+									  cout << filename;
+									  cout << endl;
+
+								      std::ofstream  dst(filename.c_str(),   std::ios::binary);
+
+								      dst << src.rdbuf();
+
 
 							}
 		    			}	
@@ -914,39 +991,137 @@ void bucketStats()
 
 int realGame()
 {
-	int NUMTRIALS = 10;
+	int NUMTRIALS = 500000;
 	
 	int bucket = -1;
 	int seed = -1;
 	int item = -1;
+	int file =  -1;
+	int fileNum = 0;
+	int itemNum = 0;
+
+	DIR *dir;
+	DIR *subdir;
+	
+	struct dirent *ent;
+	struct dirent *subent;
+	int jams[6] = {0};
+
+	ostringstream os;
+	string filename;
+	string line;
+
+	gameInfo data;
+	int blankRecord[8][16] = {0};	
+
+	double average = 0.0;
 
 	for (int trial = 0; trial < NUMTRIALS; trial++)
 	{
 		//Pick a buckets
 		bucket = weightedDice(bucketWeights);
+		//bucket = 9;
+		//printf("Choosing Bucket %i \n", bucket);
+			
+		os.str(std::string()); //clear the stream
+		os << "./buckets/B" << bucket;
+		filename = os.str();
+		
 
-		printf("Choosing Bucket %i \n", bucket);
+		if ((dir = opendir (filename.c_str())) != NULL) 
+		{
+			  
+		} else perror("Error");
+	
+
+		if (bucketFileSize[bucket] > 1)
+		{
+			//printf("Ill have to pick a bucket\n");
+			file = 1; //TODO
+		} else file = 0;
+
+		fileNum = 0;
+
+		 	while ((ent = readdir (dir)) != NULL) 
+		 	{
+		 		if (ent->d_name[0] != '.')
+		 		{
+		     		//printf ("[%i] %s\n", fileNum, ent->d_name); 
+		     		 if (fileNum == file) {
+		//     		// 	printf("^^^this is the one \n");
+		     		 	break;
+		     		 } 
+		//     		// else
+					 fileNum++;
+		     	}
+
+		 	}
+
+		 os << "/" << ent->d_name;
+		 filename = os.str();
+		 //printf("Ok, I have %s ready\n",filename.c_str());
+		 //printf("Ready to choose the item now\n");
 
 		item = RanGen.IRandom(0, bucketSize[bucket]-1);	
-		printf("Choosing Item number %i \n", item);
+		//printf("Choosing Item number %i \n", item);
+
+		 ifstream myfile (filename.c_str());
+
+		 						 itemNum = 0;
+								  if (myfile.is_open())
+								  {
+								    while ( getline (myfile,line) )
+								    {
+								      seed = to_int(line.c_str());
+								      //printf("%i Seed: %i\n", itemNum, seed);
+								      if (itemNum == item) break;
+								      itemNum++;
+								  	}
+								  }
 
 
+						//printf("Selected seed: %i\n", seed);
 
+		closedir(dir);
+		
+
+		playGame(seed, &data, blankRecord);
+		//printf("------------------\n");
+		if (trial > 0) average = ((average*(double)trial)+(double)data.totalWins)/((double)trial+1.0) ; else average = data.totalWins;
+		//printf("%10i %f\n", data.totalWins, average);
 	}
 
-
+	printf("Average: %f\n", average);
 
 }
+
+
+
+
+
 
 int main()
 {
 	//for (int i=1; i<11; i++)	farmer(1, i);
-	//gameInfo data;
-	//bucketStats();
-	 //int blankRecord[8][16] = {0};
-
-	//playGame(4, &data, blankRecord);
+	//	//bucketStats();
+	//int blankRecord[8][16] = {0};
 	
+	//gameInfo data;
+	//playGame(9, &data, blankRecord);
+	
+	
+
+
+
+	//int gameBoard[NUMROWS][NUMCOLS] = {0};
+
+	//Rng tileRng;
+	//tileRng.setSeed(1);
+
+	//createGame	(gameBoard, &tileRng	);
+
+	
+
 	realGame();
 	//playGame(1, &data);
 	//printf("You belong in %i\n", data.totalDrops);
