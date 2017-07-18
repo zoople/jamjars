@@ -12,8 +12,19 @@
 #define FEATURE_FRUITBURST 2
 #define FEATURE_FRUITBUNCH 3
 
-
 #include "jamjarsPaytable.h"
+#include "C:/random/randomc.h"
+#include "C:/random/mersenne.cpp"
+
+#include <fstream>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <string>
+#include <dirent.h>
+using namespace std;
+
+
 
 class Rng {
 	unsigned long long initialSeed;
@@ -36,6 +47,34 @@ class Rng {
 
 } ;
 
+struct gameInfo
+	{
+		int wins;
+		int drops;
+		int numWins;
+		int totalWins;
+		int totalDrops;
+		int totalNumWins;
+	} ;
+
+ int seed = (int)time(0); 
+	 CRandomMersenne RanGen(seed); 
+
+int weightedDice(int* dist)
+{
+	int pick;
+
+	int dice =  RanGen.IRandom(0, dist[1]-1);	
+	int checkpoint=0;
+
+	for (pick = 2; pick<=(dist[0]+1); pick++)
+	{
+			checkpoint += dist[pick];
+			if (dice < checkpoint) break;
+	}
+	return pick-2;
+}
+
 
 /*
 	print the game board to help with debugging. 
@@ -55,8 +94,7 @@ int printBoard(int (*gameBoard)[NUMCOLS])
 
 		printf("\n");
 	}
-	printf("----------------------------\n");
-	
+	printf("----------------------------\n");	
 }
 
 
@@ -184,8 +222,8 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 			int winMade = 0;
 			int safety = 0;
 
-			printf("Here is where you started:\n");
-			printBoard(gameBoard);
+			//printf("Here is where you started:\n");
+			//printBoard(gameBoard);
 
 			while (!winMade && safety<100)
 			{
@@ -353,8 +391,8 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 								printf("\n");
 		}
 
-		printBoard	(clearBoard	);
-		printBoard	(gameBoard	);
+		//printBoard	(clearBoard	);
+		//printBoard	(gameBoard	);
 		deleteAndPopulate(gameBoard, clearBoard, tileRng);
 		
   // 		//BL - TR diagonal
@@ -384,8 +422,9 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 /*
 	Check the array for wins
 */
-int checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng *tileRng)
+void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng *tileRng, gameInfo *info, int (*winRecorder)[16])
 {
+
 	int markBoard[NUMROWS][NUMCOLS] = {{0}}; //this is so you know where you have looked
 	int clearBoard[NUMROWS][NUMCOLS] = {{0}}; //this is so you know what to delete
 
@@ -393,23 +432,7 @@ int checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng
 
 	int winStarts[NUMCOLS*NUMROWS][2] = {{0}}; //This keeps a track of where the wins start from, so we can find them later.
 	int numWins = 0; 
-
 	int wins = 0;
-
-	// //Apply any special features
-	// if (state != STATE_BOUGHTGAME)
-	// {
-	// 		for (int t=1; t<7; t++) {
-	// 			//printf("Trigger %i : %i\n", t, triggers[t]);
-	// 			if (triggers[t] >0) {
-	// 				applyFeature(  gameBoard, state, t, tileRng);
-	// 				triggers[t]--;
-	// 				break;
-	// 				}
-				
-	// 		}
-		
-	// }
 
 	//Check all squares
 	for (int x=0; x<NUMCOLS; x++)
@@ -418,39 +441,45 @@ int checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng
 		if (markBoard[x][y] == 0) //only look into it if we haven't been there before
 		{
 			clusterLength = checkSquare(gameBoard, markBoard, x, y); 
-			printf("(%i, %i), Symbol = %i, Number =  %i\n", x, y, gameBoard[x][y],clusterLength);
+			//printf("(%i, %i), Symbol = %i, Number =  %i\n", x, y, gameBoard[x][y],clusterLength);
 			if (clusterLength >= MINCLUSTERLENGTH) { //only care if it's a win, and it can only be a win if it's bigger than the minimum cluster length
 				jam[ gameBoard[x][y]  ] += jamCollection[gameBoard[x][y]][clusterLength];  //award jam based on the cluser
 				if ( jam[ gameBoard[x][y] ] >= jamTriggers[ gameBoard[x][y] ] ) { triggers[ gameBoard[x][y] ] ++; jam[ gameBoard[x][y]] = 0; triggers[0]++;} //mark triggers as ready if the jam jar is full
-				printf("RECORDED, this is win %i\n",numWins); 
+				//printf("RECORDED, this is win %i\n",numWins); 
+
 				 winStarts[numWins][0] = x;   //record the win
 				 winStarts[numWins][1] = y; 
-				printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
+				//printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
 				 numWins++; 
 				 wins += paytable[gameBoard[x][y]][clusterLength]; //award the win
 				 printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
-
+				 winRecorder[gameBoard[x][y]][clusterLength]++;
 				
 			}
-		} else printf("(%i, %i), Skipped\n");  //don't check the square if it was already looked at
+		} //else printf("(%i, %i), Skipped\n");  //don't check the square if it was already looked at
 				
 	}
 
 	//Mark winning combinations for deletion
 	for (int win = 0; win< numWins; win++)
 	{
-		printf("Win at %i, %i\n", winStarts[win][0], winStarts[win][1]);
+		//printf("Win at %i, %i\n", winStarts[win][0], winStarts[win][1]);
 
 		checkSquare(gameBoard, clearBoard, winStarts[win][0], winStarts[win][1]);
 	}
 
-	printf("Ready to delete\n");
-	printBoard(clearBoard);
+	//printf("Ready to delete\n");
+	//printBoard(clearBoard);
 	deleteAndPopulate(gameBoard, clearBoard, tileRng);
-	printf("New board:\n");
-	printBoard(gameBoard);
+	//printf("New board:\n");
+	//printBoard(gameBoard);
 
-	return wins;
+	info->wins += wins;
+	info->drops ++;
+	//printf ("--------------------------------------DROP COUNTED--------------------------------------------------------------------------------\n");
+	info->numWins +=numWins;
+	
+	return;
 	
 }
 
@@ -462,7 +491,7 @@ int checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng
 int createGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 {
 	int row,col =0;
-	printf("Seed: %i\n", tileRng->getSeed());
+	//printf("Seed: %i\n", tileRng->getSeed());
 	int tile = 0;
 	int rngResult = 0;
 
@@ -490,7 +519,7 @@ int shuffleBoard(int (*gameBoard)[NUMCOLS], Rng *tileRng )
 	numShuffles = 15 + tileRng->getNext(15);
 	int temp =0;
 
-	printf ("Going to do %i shuffles\n", numShuffles);
+	//printf ("Going to do %i shuffles\n", numShuffles);
 
 	int sA, sB, rA,cA,rB,cB = 0;
 
@@ -519,15 +548,15 @@ int shuffleBoard(int (*gameBoard)[NUMCOLS], Rng *tileRng )
 		gameBoard[rB][cB] = temp;
 	}
 
-	printBoard(gameBoard);
+	//printBoard(gameBoard);
 
 }
 
-int main()
+int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 {
 	int gameBoard[NUMROWS][NUMCOLS] = {0};
 	Rng tileRng;
-	tileRng.setSeed(10);
+	tileRng.setSeed(gameSeed);
 	int numWins = 0;
 
 	int jam[7] = {0};
@@ -537,24 +566,20 @@ int main()
 	int featureChoice = 0;
 
 	createGame(gameBoard, &tileRng );
-	printBoard(gameBoard);
+	//printBoard(gameBoard);
 
 
 	int state = STATE_BOUGHTGAME;
 
-	struct gameInfo
-	{
-		int wins;
-		int drops;
-		int totalWins;
-		int totalDrops;
-	} data;
+	
 
 
-	data.wins = 0;
-	data.drops = 0;
-	data.totalWins = 0;
-	data.totalDrops = 0;
+	data->wins=0;
+	data->drops = 0;
+	data->numWins = 0;
+	data->totalWins = 0;
+	data->totalDrops = 0;
+	data->totalNumWins = 0;
 
 	int gameOver = 0;
 
@@ -565,31 +590,38 @@ int main()
 	numWins=-1; 
 	while (numWins>0 || numWins == -1)
 	{
-		if (numWins == -1) numWins = 0;
-		numWins = checkGame(STATE_BOUGHTGAME, gameBoard, jam, jamTriggerSwitch, &tileRng);
-		printf ("%i wins\n", numWins);
-		for (int i=0; i<7; i++) printf ("%i, ", jam[i]);
-				printf("\n");
-	
-		for (int i=0; i<7; i++) printf ("%i, ", jamTriggerSwitch[i]);
-		printf("\n");
-		data.wins += numWins;
-		data.drops ++;
-		if (data.drops > 100) numWins = 0;
+		data->numWins = 0;
 
+		if (numWins == -1) numWins = 0;
+		checkGame(STATE_BOUGHTGAME, gameBoard, jam, jamTriggerSwitch, &tileRng, data, winRecorder);
+		//printf ("%i won\n", data->wins);
+		//printf ("%i total number wins\n", data->numWins);
+		
+		//for (int i=0; i<7; i++) printf ("%i, ", jam[i]);
+		//		printf("\n");
+	
+		//for (int i=0; i<7; i++) printf ("%i, ", jamTriggerSwitch[i]);
+		//printf("\n");
+		//data.wins += numWins;
+		//data.drops ++;
+		//if (data->drops > 100) numWins = 0;
+		//numWins = data->totalNumWins;
+		numWins = data->numWins;
+		data->totalNumWins += data->numWins;
 	}
 
-	data.totalWins += data.wins;
-	data.totalDrops += data.drops;
+	data->totalWins += data->wins;
+	data->totalDrops += data->drops;
 
-	printf ("...................................End of this set of drops. Won %i in %i drops\n", data.wins, data.drops);
+	//printf ("...................................End of this set of drops. Won %i in %i drops\n", data->wins, data->drops);
 
-	data.wins = 0;
-	data.drops = 0;
+	data->wins = 0;
+	data->drops = 0;
 	
 	jamCheck = 6;
 	featureChoice = FEATURE_FRUITBURST; //TO DO - ADD SELECTION
 
+	jamTriggerSwitch[0] = 0; //DEBUG - FEATURE OFF
 
 	if (jamTriggerSwitch[0] > 0)
 	{
@@ -617,9 +649,306 @@ int main()
 	//numWins = checkGame(FEATURE_INSEASON, gameBoard, jam, jamTriggerSwitch, &tileRng);
 
 	//need to keep going, but remember that you can't call the feature again or it will do its thing, you need to check the rest of the game as if its a normal game after this. 
+	
 
-printf ("...................................End of game. Won %i in %i drops\n", data.totalWins, data.totalDrops);
+	data->totalDrops--;
 
 
+	printf ("...................................End of game. Won %i over %i wins in %i drops\n", data->totalWins, data->totalNumWins, data->totalDrops);
+	
+
+}
+
+
+int farmer(int numResults, int target)
+{
+	printf("Jam Jars Farmer\n");
+	ofstream myfile;
+
+	int blankRecord[8][16] = {0};
+
+	int redrops = 1;
+	int wins = 1;
+	 ostringstream os;
+
+		gameInfo data;
+		int seed = -1;
+
+	 for (int res=1; res<=numResults; res++)
+	 {
+	 	seed = target;
+	 	printf("Farming from seed %i\n", seed);
+	 	playGame(seed, &data,blankRecord);
+
+	 	printf("To repeat, that's %i prize over %i drops with %i wins\n", data.totalWins, data.totalDrops, data.totalNumWins);
+
+	 	redrops = data.totalDrops;
+	 	wins = data.totalNumWins;
+
+	 	if (redrops>5) redrops = 5; //LIMIT of 5, can have as many as you like...
+
+		os << "./output/R" << redrops << "/W" << wins << ".txt";
+		string filename = os.str();
+
+		myfile.open (filename.c_str(), ios::app);
+
+		if (!myfile.is_open()) 	 printf("not open yet\n");	else	myfile << seed <<"\n";
+ 		
+		myfile.close();
+
+		os.str(std::string()); //clear the stream for next time.
+	}
+
+}
+
+
+// void whichWinFile(int bucketNum, int *result)
+// {
+// 	int drops = bucketNum/5;
+// 	int wins = 
+
+// }
+
+int whichWinBucket(int drops, int wins)
+{
+	int bucketNum = -1;
+
+
+	int buckets[6][5] = 
+	{
+		{0,0,0,0,0},			
+		{1,2,3,4,5},
+		{2,3,4,5,6},
+		{3,4,5,6,8},
+		{4,5,6,10,15},
+		{5,6,7,10,15},
+	};
+
+	int bu = -1;
+	for (bu=0; bu<4; bu++)
+	{
+		//printf("boundary is %i, and i have %i\n", buckets[drops][bu], wins);
+		if (wins >= buckets[drops][bu] &&  wins < buckets[drops][bu+1]) {
+			bucketNum = bu;
+			break;
+		}
+		
+	}
+
+	if (bucketNum==-1) bucketNum = 4;
+
+	return bucketNum;
+}
+
+int to_int(char const *s)
+{
+     if ( s == NULL || *s == '\0' )
+        throw std::invalid_argument("null or empty string argument");
+
+     bool negate = (s[0] == '-');
+     if ( *s == '+' || *s == '-' ) 
+         ++s;
+
+     if ( *s == '\0')
+        throw std::invalid_argument("sign character only.");
+
+     int result = 0;
+     while(*s)
+     {
+          if ( *s >= '0' && *s <= '9' )
+          {
+              result = result * 10  - (*s - '0');  //assume negative number
+          }
+          else
+              throw std::invalid_argument("invalid input string");
+          ++s;
+     }
+     return negate ? result : -result; //-result is positive!
+} 
+
+void bucketStats()
+{
+
+
+	int stats[26][8][16] = {{0}};
+
+	int bucketNum = 6;
+	int curBoundry = -1;
+	unsigned char isFile =0x8;
+	int numSeeds = 0;
+
+	DIR *dir;
+	DIR *subdir;
+	
+	struct dirent *ent;
+	struct dirent *subent;
+	
+	ostringstream os;
+	string filename;
+	string line;
+	
+	int gameSeed = 0;
+
+		gameInfo data;
+	
+	if ((dir = opendir ("output")) != NULL) 
+	{
+	  	/* print all the files and directories within directory */
+	  	while ((ent = readdir (dir)) != NULL) {
+	  		//If it is a file
+	    	if (ent->d_type == isFile)
+	    	{
+	    	 	 printf ("%s\n", ent->d_name); 
+	    	} else
+	    	//If it is a directory
+	    	{
+	    		if (ent->d_name[0] != '.') //Don't need to worry about going up directories
+	    		{
+		    		printf ("[%s]\n", ent->d_name);	
+
+					os.str(std::string()); //clear the stream
+					os << "./output/" << ent->d_name; //append the directory so we can read from it
+					filename = os.str();
+					
+					numSeeds = 0;
+		    		if ((subdir = opendir (filename.c_str())) != NULL) 
+		    		{
+		    			while ((subent = readdir (subdir)) != NULL) 
+		    			{
+		    				if (subent->d_name[0] != '.') 
+		    				{
+								printf ("%s-------------------------------------------------------------------------------\n", subent->d_name); 
+								///NOW ALL THE MAGIC happens
+								printf("first thing, i know that this file has %i wins and %i drops\n", subent->d_name[1]-'0', ent->d_name[1]-'0' );
+								bucketNum = whichWinBucket(ent->d_name[1]-'0', subent->d_name[1]-'0');
+								printf("So, ill put it in the %i bucket\n", bucketNum);
+								printf("What you mean is bucket %i\n", (ent->d_name[1]-'0'-1)*5+bucketNum+1 );
+								os.str(std::string()); //clear the stream
+								os << "./output/" << ent->d_name;
+								os << "/" << subent->d_name;
+								filename = os.str();
+								printf("Let's open the file: %s\n", filename.c_str());
+
+								  ifstream myfile (filename.c_str());
+								  numSeeds=0;
+								  if (myfile.is_open())
+								  {
+								    while ( getline (myfile,line) )
+								    {
+								      gameSeed = to_int(line.c_str());
+								      printf("Seed: %i\n", gameSeed);
+								      numSeeds++;
+								      playGame(gameSeed, &data, stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1]);
+
+								
+								      printf ("END. Won %i over %i wins in %i drops\n", data.totalWins, data.totalNumWins, data.totalDrops);
+	
+								    }
+								    	printf("%i seeds in this bucket\n", numSeeds);
+								    	stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1][0][0] = numSeeds;
+								    	for (int wi=0; wi<8; wi++)
+										{
+											for (int wj=0; wj<15; wj++)
+											{
+												printf("%2i", stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1][wi][wj]);
+											}
+											printf("\n");
+										}
+										
+
+								    myfile.close();
+								  }
+
+							}
+		    			}	
+		    		}
+		    			closedir (subdir);
+		    		} else perror("");
+	    		}
+	    	} 
+	  	  closedir (dir);
+		} else {
+	  	/* could not open directory */
+	  	perror ("");
+  	}
+
+  	printf("*************************************************************\n");
+  	for (int bucketN=0; bucketN<=25; bucketN++)
+  	{
+  		printf("Bucket %i------------------------------------------------\n", bucketN);
+  		printf("Seeds: %i\n", stats[bucketN][0][0]);
+  		for (int wi=0; wi<8; wi++)
+										{
+											for (int wj=0; wj<15; wj++)
+											{
+												printf("%2i", stats[bucketN][wi][wj]);
+											}
+											printf("\n");
+										}
+
+
+
+
+  	}
+
+
+	// for (int rd=0; rd<6; rd++)
+	// {
+	// 	printf("REDROPS %i -----------------------------------------------------\n", rd);
+	// 	for (int nwB=0; nwB<5; nwB++)
+	// 	{
+	// 		curBoundry = buckets[rd][nwB];
+	// 		printf("Boundry: %i\n", nwB);
+
+	// 		//As for the files that fit into the buckets
+	// 		if (nwB<4) {
+
+	// 		} 
+
+	// 		//For anything at the end, eg, 15+, rather than asking, go through all the files and just 
+
+	// 	}
+	// }
+
+}
+
+int realGame()
+{
+	int NUMTRIALS = 10;
+	
+	int bucket = -1;
+	int seed = -1;
+	int item = -1;
+
+	for (int trial = 0; trial < NUMTRIALS; trial++)
+	{
+		//Pick a buckets
+		bucket = weightedDice(bucketWeights);
+
+		printf("Choosing Bucket %i \n", bucket);
+
+		item = RanGen.IRandom(0, bucketSize[bucket]-1);	
+		printf("Choosing Item number %i \n", item);
+
+
+
+	}
+
+
+
+}
+
+int main()
+{
+	//for (int i=1; i<11; i++)	farmer(1, i);
+	//gameInfo data;
+	//bucketStats();
+	 //int blankRecord[8][16] = {0};
+
+	//playGame(4, &data, blankRecord);
+	
+	realGame();
+	//playGame(1, &data);
+	//printf("You belong in %i\n", data.totalDrops);
 
 }
