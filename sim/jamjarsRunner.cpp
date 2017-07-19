@@ -5,7 +5,7 @@
 #define NUMROWS 7
 #define NUMCOLS 7
 #define NUMSYMBOLS 6
-#define MINCLUSTERLENGTH 3
+#define MINCLUSTERLENGTH 5
 
 #define STATE_BOUGHTGAME 0
 #define FEATURE_INSEASON 1
@@ -338,9 +338,9 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 				numBunches--;
 			}
 
-			printBoard(clearBoard);
+			//printBoard(clearBoard);
 			deleteAndPopulate(gameBoard, clearBoard, tileRng, jamSwitcher	);
-			printBoard(gameBoard);
+			//printBoard(gameBoard);
 
 
 	}
@@ -486,7 +486,7 @@ void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rn
 				//printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
 				 numWins++; 
 				 wins += paytable[gameBoard[x][y]][clusterLength]; //award the win
-				 printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
+				 //printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
 				 winRecorder[gameBoard[x][y]][clusterLength]++;
 				
 			}
@@ -656,10 +656,10 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	int featureChoice = 0;
 
 	createGame(gameBoard, &tileRng );
-	printBoard(gameBoard);
+	//printBoard(gameBoard);
 
-	//assignJam(whichJam);
-	//changePattern(gameBoard, whichJam		);
+	assignJam(whichJam);
+	changePattern(gameBoard, whichJam		);
 	
 	int state = STATE_BOUGHTGAME;
 
@@ -705,7 +705,7 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	data->totalWins += data->wins;
 	data->totalDrops += data->drops;
 
-	printf ("...................................End of this set of drops. Won %i in %i drops\n", data->wins, data->drops);
+	//printf ("...................................End of this set of drops. Won %i in %i drops\n", data->wins, data->drops);
 
 	data->wins = 0;
 	data->drops = 0;
@@ -989,7 +989,7 @@ void bucketStats()
   		printf("Seeds: %i\n", stats[bucketN][0][0]);
   		for (int wi=0; wi<8; wi++)
 										{
-											for (int wj=0; wj<15; wj++)
+											for (int wj=0; wj<16; wj++)
 											{
 												printf("%2i", stats[bucketN][wi][wj]);
 											}
@@ -1024,7 +1024,7 @@ void bucketStats()
 
 int realGame()
 {
-	int NUMTRIALS = 500000;
+	int NUMTRIALS = 1000000;
 	
 	int bucket = -1;
 	int seed = -1;
@@ -1049,16 +1049,18 @@ int realGame()
 
 	double average = 0.0;
 
+	printf("Real thing\n");
+
 	for (int trial = 0; trial < NUMTRIALS; trial++)
 	{
-		//Pick a buckets
-		bucket = weightedDice(bucketWeights);
-		//bucket = 9;
-		//printf("Choosing Bucket %i \n", bucket);
+	 	//Pick a buckets
+	 	bucket = weightedDice(bucketWeights);
+	// 	//bucket = 9;
+	 	//printf("Choosing Bucket %i \n", bucket);
 			
-		os.str(std::string()); //clear the stream
-		os << "./buckets/B" << bucket;
-		filename = os.str();
+	 	os.str(std::string()); //clear the stream
+	 	os << "./buckets/B" << bucket;
+	 	filename = os.str();
 		
 
 		if ((dir = opendir (filename.c_str())) != NULL) 
@@ -1124,7 +1126,7 @@ int realGame()
 		//printf("%10i %f\n", data.totalWins, average);
 	}
 
-	printf("Average: %f\n", average);
+	 printf("Average: %f\n", average);
 
 }
 
@@ -1136,16 +1138,15 @@ int realGame()
 int main()
 {
 	//for (int i=1; i<11; i++)	farmer(1, i);
-	//	//bucketStats();
-	int blankRecord[8][16] = {0};
+	//bucketStats();
+	//int blankRecord[8][16] = {0};
 	
-	gameInfo data;
-	playGame(7, &data, blankRecord);
-	
-	
+	//gameInfo data;
+	//playGame(8, &data, blankRecord);
+	//for (int i=1; i<=10; i++)	farmer(1,i);
 
-
-
+	//farmer(1,8);
+	realGame();
 	//int gameBoard[NUMROWS][NUMCOLS] = {0};
 
 	//Rng tileRng;
@@ -1156,7 +1157,6 @@ int main()
 	
 
 	//realGame();
-	//playGame(1, &data);
 	//printf("You belong in %i\n", data.totalDrops);
 
 }
