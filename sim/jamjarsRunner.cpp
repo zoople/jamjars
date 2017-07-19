@@ -75,6 +75,30 @@ int weightedDice(int* dist)
 	return pick-2;
 }
 
+int weightedDice(int* dist, Rng *tileRng)
+{
+	int dice = 0;
+	//printf("New weighted dice\n");
+
+	 tileRng->generateNext();
+	 dice = tileRng->getNext(dist[1]);
+	 dice++;
+
+	// printf("%i, ", dice);
+	return dice;
+	
+	
+
+	// int checkpoint=0;
+
+	// for (pick = 2; pick<=(dist[0]+1); pick++)
+	// {
+	// 		checkpoint += dist[pick];
+	// 		if (dice < checkpoint) break;
+	// }
+	// return pick-2;
+}
+
 
 /*
 	print the game board to help with debugging. 
@@ -183,11 +207,12 @@ int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng
 		
 		for (col = NUMCOLS-1; col > NUMCOLS-spotsToFill[row] -1; col--) 
 		{	
-			tileRng->generateNext();
+			int tile = weightedDice(patternWeights, tileRng);
 
-			if (js[0] == 0) gameBoard[row][col] = 1+ tileRng->getNext(NUMSYMBOLS); 
+
+			if (js[0] == 0) gameBoard[row][col] = tile; 
 			else {
-					j = 1+ tileRng->getNext(NUMSYMBOLS);
+					j = tile;
 					 gameBoard[row][col] = js[j-1];
 
 			}
@@ -461,7 +486,7 @@ void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rn
 				//printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
 				 numWins++; 
 				 wins += paytable[gameBoard[x][y]][clusterLength]; //award the win
-				// printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
+				 printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
 				 winRecorder[gameBoard[x][y]][clusterLength]++;
 				
 			}
@@ -508,14 +533,22 @@ int createGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 	{
 		for (col = 0; col<NUMCOLS; col++)
 		{
-			tileRng->generateNext();
-			rngResult = tileRng->getNext();
-			tile = 1+ tileRng->getNext(NUMSYMBOLS);
+			
+			//printf("%i(", rngResult);
+			
+			//printf("%i),", tile);
+			tile = weightedDice(patternWeights, tileRng);
+		
+			//tileRng->generateNext();
+			//rngResult = tileRng->getNext();
+			//tile = tileRng->getNext(NUMSYMBOLS);
 
+			
 			gameBoard[row][col] = tile;
 			//printf("%i  > %i.\n", rngResult, tile);
 
 		}
+		//printf("\n");
 	}
 
 }
@@ -623,10 +656,10 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	int featureChoice = 0;
 
 	createGame(gameBoard, &tileRng );
-	//printBoard(gameBoard);
+	printBoard(gameBoard);
 
-	assignJam(whichJam);
-	changePattern(gameBoard, whichJam		);
+	//assignJam(whichJam);
+	//changePattern(gameBoard, whichJam		);
 	
 	int state = STATE_BOUGHTGAME;
 
@@ -672,7 +705,7 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	data->totalWins += data->wins;
 	data->totalDrops += data->drops;
 
-	//printf ("...................................End of this set of drops. Won %i in %i drops\n", data->wins, data->drops);
+	printf ("...................................End of this set of drops. Won %i in %i drops\n", data->wins, data->drops);
 
 	data->wins = 0;
 	data->drops = 0;
@@ -1104,10 +1137,10 @@ int main()
 {
 	//for (int i=1; i<11; i++)	farmer(1, i);
 	//	//bucketStats();
-	//int blankRecord[8][16] = {0};
+	int blankRecord[8][16] = {0};
 	
-	//gameInfo data;
-	//playGame(9, &data, blankRecord);
+	gameInfo data;
+	playGame(7, &data, blankRecord);
 	
 	
 
@@ -1122,7 +1155,7 @@ int main()
 
 	
 
-	realGame();
+	//realGame();
 	//playGame(1, &data);
 	//printf("You belong in %i\n", data.totalDrops);
 
