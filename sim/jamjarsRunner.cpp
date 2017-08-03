@@ -521,7 +521,6 @@ void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rn
 /*
 	create a fresh game
 */
-
 int createGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 {
 	int row,col =0;
@@ -594,6 +593,8 @@ int shuffleBoard(int (*gameBoard)[NUMCOLS], Rng *tileRng )
 
 }
 
+/* Change the pattern into a real game board by using the jam assignment. Jam assignment will say what jam goes into what slot */
+
 void changePattern( 	int (*gameBoard)[NUMCOLS], int *jamAssignment  )
 {
 	//printBoard	(gameBoard	);
@@ -608,6 +609,8 @@ void changePattern( 	int (*gameBoard)[NUMCOLS], int *jamAssignment  )
 
 	//printBoard	(gameBoard	);
 }
+
+// Assignes anem to jam slots 
 
 void assignJam(int* whichJam)
 {

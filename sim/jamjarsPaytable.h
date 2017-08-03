@@ -1,19 +1,43 @@
+/*
+Paytable.
 
+Format:
+{
+	JAM0 - Pay for OAK 0, 1, 2, 3, 4 ... 15
+	JAM1 - Pay for OAK 0, 1, 2, 3, 4 ... 15
+	...
+	JAM6 - Pay for OAK 0, 1, 2, 3, 4 ... 15
+}
+All pays listed as multipliers. IE 15 means 15 x bet
+
+Remember that some pays can be the same, ie, 12 OAK, 13 OAK and 14 OAK might be the same. This is how the paytable is, if you look on games like Gemix, the paytable says things like 12-14 
+
+*/
 const int paytable[8][16] = 
 {
 	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	{100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115},
-	{200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215},
-	{300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315},
-	{400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415},
-	{500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515},
-	{600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615},
-	{700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715},
-	
+	{0,0,0,0,0,350,700,1000,1500,2500,4000,4000,20000,20000,20000,100000},
+	{0,0,0,0,0,250,350,500,750,1000,1500,1500,10000,10000,10000,50000},
+	{0,0,0,0,0,100,200,300,500,750,1500,1500,5000,5000,5000,20000},
+	{0,0,0,0,0,75,100,150,200,300,500,500,1000,1000,1000,5000},
+	{0,0,0,0,0,30,40,50,75,100,200,200,500,500,500,1500},
+	{0,0,0,0,0,15,25,30,50,75,100,100,250,250,250,1000},
 };
 
-const int jamTriggers[7] = {0, 120, 120, 120, 120, 120, 120};
 
+/*
+Jam Collection Rate 
+
+{
+	JAM0 - Amout of Jam collected for OAK 0, 1, 2, 3, 4 ... 15
+	JAM1 - Amout of Jam collected for OAK 0, 1, 2, 3, 4 ... 15
+	...
+	JAM6 - Amout of Jam collected for OAK 0, 1, 2, 3, 4 ... 15
+}
+
+Let's call them, drops. Ie, 5 of a kind JAM1 gives x drops of jam.
+
+*/
 const int jamCollection[8][16]=
 {
 	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -27,27 +51,78 @@ const int jamCollection[8][16]=
 
 };
 
+/*
+Jam Triggers (should be called Jam Capacity).
+
+Dertemines when the jars are full. IE, When JARN has X drops, it is full
+
+{JAM0_CAPACITY, JAM1_CAPACITY ... JAM6_CAPACITY}
+
+*/
+const int jamTriggers[7] = {0, 120, 120, 120, 120, 120, 120};
+
+/*
+Bucket Weights.
+
+Determines which bucket to choose when running the simulator.
+
+Notes:
+- The format is in the "Weighted" format: {number_of_items, total_weight, item1_weight, item2_weight ... itemN_weight}
+- The layout is just to make it easier to compare / send to and from Excel it could be in a straight line, but now it's:
+
+NUMBER_OF_BUCKETS, TOTAL_WEIGHT_OF_BUCKETS,
+
+BUCKET0,
+BUCKET1, BUCKET2, 	... BUCKET5,
+BUCKET6, ...		...	BUCKET9,
+...,
+BUCKET21, ...		...	BUCKET25,
+
+
+*/
 int bucketWeights[28] = 
 {
-26,9,
-0,
+26,13,
+
+10,
+1,0,0,0,0,
+1,0,0,0,0,
+1,0,0,0,0,
 0,0,0,0,0,
-0,0,1,1,1,
-0,2,1,0,1,
 0,0,0,0,0,
-0,0,1,0,1,
 };
 
+/*
+Bucket Size.
+
+Specifies the size of the buckets, ie, how many seeds are in each bucket. 
+The format is the same as the second part of the bucket weights, just there to make it easier to copy to/from Excel
+
+BUCKET0
+BUCKET1 BUCKET2 ... BUCKET5
+BUCKET6 ...		...	BUCKET9
+...
+BUCKET21 ...	...	BUCKET25
+
+*/
 const int bucketSize[26] = 
 {
-0,
+4,
+3,0,0,0,0,
+2,0,0,0,0,
+1,0,0,0,0,
 0,0,0,0,0,
-0,0,1,3,1,
-0,1,1,0,1,
-0,0,0,0,1,
-0,0,1,0,1,
+0,0,0,0,0,
+
+
 };
 
+/*
+Bucket File Size.
+
+??
+
+*/
 const int bucketFileSize[26] = 
 {
 0,
@@ -58,6 +133,24 @@ const int bucketFileSize[26] =
 0,0,1,0,1,
 };
 
+/*
+Pattern Weights.
+
+Determines which JAMSLOT to put into the grid when one is needed.
+
+In the Weighted format: {NUMBER_OF_JAMSLOTS, TOTAL_WEIGHT, JAMSLOT1_WEIGHT, ... JAMSLOT6 WEIGHT}
+
+*/
+ int patternWeights[8] = {6,6,1,1,1,1,1,1};
+
+
+/*
+Jam Weights.
+
+Determines which JAMSLOT to put into the grid when one is needed.
+
+In the Weighted format: {NUMBER_OF_JAMS, TOTAL_WEIGHT, JAM1_WEIGHT, ... JAM6 WEIGHT}
+
+*/
 const int jamWeights[8] = {6, 21,1,3,6,4,5,2};
 
- int patternWeights[8] = {6,6,1,1,1,1,1,1};
