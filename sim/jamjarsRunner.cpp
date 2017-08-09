@@ -644,7 +644,7 @@ void assignJam(int* whichJam)
 
 }
 
-int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
+int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJam)
 {
 	int gameBoard[NUMROWS][NUMCOLS] = {0};
 	Rng tileRng;
@@ -661,9 +661,12 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 	createGame(gameBoard, &tileRng );
 	//printBoard(gameBoard);
 
+	if (dynamicJam)
+	{
 	assignJam(whichJam);
 	changePattern(gameBoard, whichJam		);
-	
+	}
+
 	int state = STATE_BOUGHTGAME;
 
 	
@@ -754,8 +757,17 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16])
 
 }
 
+/*
+Farmer
+Runs seeds and categorizes them by number of redrops and number of wins
 
-int farmer(int numResults, int target)
+  numResults: number of seeds needed
+  startSeed: the seed number to begin from (may want this if you are looking for new stuff that you havent got yet and dont want to go over the old seeds)
+  redropTarget (default -1 = OFF, no target) : if you want to ignore anything but results that have this number of redrops
+  winTarget (default -1 = OFF, no target) : if you want to ignore anything but results that have this number of wins
+  
+*/
+int farmer(int numResults, int startSeed, int redropTarget=-1, int winTarget=-1)
 {
 	printf("Jam Jars Farmer\n");
 	ofstream myfile;
@@ -769,30 +781,45 @@ int farmer(int numResults, int target)
 		gameInfo data;
 		int seed = -1;
 
-	 for (int res=1; res<=numResults; res++)
-	 {
-	 	seed = target;
-	 	printf("Farming from seed %i\n", seed);
-	 	playGame(seed, &data,blankRecord);
 
-	 	printf("To repeat, that's %i prize over %i drops with %i wins\n", data.totalWins, data.totalDrops, data.totalNumWins);
+	 for (int res=0; res<numResults; res++)
+	 {
+	 	seed = startSeed + res;
+	 	printf("Farming from seed %i\n", seed);
+	 	playGame(seed, &data,blankRecord, false);
+
+	 	//printf("To repeat, that's %i prize over %i drops with %i wins\n", data.totalWins, data.totalDrops, data.totalNumWins);
 
 	 	redrops = data.totalDrops;
 	 	wins = data.totalNumWins;
 
 	 	if (redrops>5) redrops = 5; //LIMIT of 5, can have as many as you like...
 
-		os << "./output/R" << redrops << "/W" << wins << ".txt";
-		string filename = os.str();
+	 	if (  (redropTarget == redrops || redropTarget == -1) &&   (winTarget == wins || winTarget == -1) )
+		 {
+			os << "./output/R" << redrops << "/W" << wins << ".txt";
+			string filename = os.str();
 
-		myfile.open (filename.c_str(), ios::app);
+			myfile.open (filename.c_str(), ios::app);
 
-		if (!myfile.is_open()) 	 printf("not open yet\n");	else	myfile << seed <<"\n";
- 		
-		myfile.close();
+			if (!myfile.is_open()) 	 printf("not open yet\n");	else	myfile << seed <<"\n";
+	 		
+			myfile.close();
+		}
 
 		os.str(std::string()); //clear the stream for next time.
 	}
+
+	os << "./FarmLog.txt";
+	string filename = os.str();
+
+			myfile.open (filename.c_str(), ios::app);
+
+			if (!myfile.is_open()) 	 printf("not open yet\n");	else	myfile << startSeed << "-" << startSeed+numResults-1 << ",R" << redropTarget << ",W" << winTarget  <<"\n";
+	 		
+			myfile.close();
+
+	os.str(std::string()); //clear the stream for next time.
 
 }
 
@@ -809,21 +836,13 @@ int whichWinBucket(int drops, int wins)
 	int bucketNum = -1;
 
 
-	int buckets[6][5] = 
-	{
-		{0,0,0,0,0},			
-		{1,2,3,4,5},
-		{2,3,4,5,6},
-		{3,4,5,6,8},
-		{4,5,6,10,15},
-		{5,6,7,10,15},
-	};
+
 
 	int bu = -1;
 	for (bu=0; bu<4; bu++)
 	{
-		//printf("boundary is %i, and i have %i\n", buckets[drops][bu], wins);
-		if (wins >= buckets[drops][bu] &&  wins < buckets[drops][bu+1]) {
+		//printf("boundary is %i, and i have %i\n", bucketDef[drops][bu], wins);
+		if (wins >= bucketDef[drops][bu] &&  wins < bucketDef[drops][bu+1]) {
 			bucketNum = bu;
 			break;
 		}
@@ -871,6 +890,7 @@ void bucketStats()
 	int curBoundry = -1;
 	unsigned char isFile =0x8;
 	int numSeeds = 0;
+	int numFiles[26]= {0};
 
 	DIR *dir;
 	DIR *subdir;
@@ -881,6 +901,7 @@ void bucketStats()
 	ostringstream os;
 	string filename;
 	string line;
+	ofstream myfileb;
 	
 	int gameSeed = 0;
 
@@ -933,7 +954,7 @@ void bucketStats()
 								      gameSeed = to_int(line.c_str());
 								      printf("Seed: %i\n", gameSeed);
 								      numSeeds++;
-								      playGame(gameSeed, &data, stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1]);
+								      playGame(gameSeed, &data, stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1], false);
 
 								
 								      printf ("END. Won %i over %i wins in %i drops\n", data.totalWins, data.totalNumWins, data.totalDrops);
@@ -941,7 +962,7 @@ void bucketStats()
 								    }
 								    	printf("%i seeds in this bucket\n", numSeeds);
 								    	stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1][0][0] = numSeeds;
-								    	for (int wi=0; wi<8; wi++)
+								    	for (int wi=1; wi<8; wi++)
 										{
 											for (int wj=0; wj<15; wj++)
 											{
@@ -969,11 +990,15 @@ void bucketStats()
 
 								      std::ofstream  dst(filename.c_str(),   std::ios::binary);
 
+								      numFiles[((ent->d_name[1]-'0'-1)*5+bucketNum+1)]++;
+
 								      dst << src.rdbuf();
 
 
 							}
+
 		    			}	
+
 		    		}
 		    			closedir (subdir);
 		    		} else perror("");
@@ -990,9 +1015,9 @@ void bucketStats()
   	{
   		printf("Bucket %i------------------------------------------------\n", bucketN);
   		printf("Seeds: %i\n", stats[bucketN][0][0]);
-  		for (int wi=0; wi<8; wi++)
+  		for (int wi=1; wi<7; wi++)
 										{
-											for (int wj=0; wj<16; wj++)
+											for (int wj=5; wj<16; wj++)
 											{
 												printf("%2i", stats[bucketN][wi][wj]);
 											}
@@ -1003,31 +1028,68 @@ void bucketStats()
 
 
   	}
+  	printf("*************************************************************\n");
+  	printf("Number of seeds:");
+  	for (int bucketN=0; bucketN<=25; bucketN++) printf("%i,", stats[bucketN][0][0]);
+  	printf("\n");
+ 	printf("Number of files:");
+  	for (int bucketN=0; bucketN<=25; bucketN++) printf("%i,", numFiles[bucketN]);
+  	printf("\n");
 
 
-	// for (int rd=0; rd<6; rd++)
-	// {
-	// 	printf("REDROPS %i -----------------------------------------------------\n", rd);
-	// 	for (int nwB=0; nwB<5; nwB++)
-	// 	{
-	// 		curBoundry = buckets[rd][nwB];
-	// 		printf("Boundry: %i\n", nwB);
+								os.str(std::string()); //clear the stream
+								os << "./buckets/bucketStats.txt"; 
+								filename = os.str();
 
-	// 		//As for the files that fit into the buckets
-	// 		if (nwB<4) {
 
-	// 		} 
+								ofstream ofs (filename.c_str(), std::ios::out | std::ios::trunc);
 
-	// 		//For anything at the end, eg, 15+, rather than asking, go through all the files and just 
 
-	// 	}
-	// }
+								printf("Let's open the file: %s\n", filename.c_str());
+
+								 
+								  numSeeds=0;
+								
+								  myfileb.open (filename.c_str(), ios::app);
+
+								  	if (!myfileb.is_open()) 
+								  	{
+								  		printf("No now its an error");
+								  	}  else
+								  	{
+								  		for (int bucketN=0; bucketN<=25; bucketN++) 
+								  		{
+									  		
+									  		myfileb << "Bucket " << bucketN << "------------------------------------------------\n";
+									  		myfileb << "Seeds: " << stats[bucketN][0][0] << "\n";
+									  		for (int wi=1; wi<7; wi++)
+											{
+												for (int wj=5; wj<16; wj++)
+												{
+													myfileb << stats[bucketN][wi][wj] << ",";
+												}
+												myfileb << "\n";
+											}
+										}
+
+										myfileb << "--------------------------------------------------------\n";
+								  		myfileb <<"Number of seeds:";
+									  	for (int bucketN=0; bucketN<=25; bucketN++) myfileb << stats[bucketN][0][0] <<",";
+									  	myfileb <<"\n";
+									 	myfileb << "Number of files:";
+									  	for (int bucketN=0; bucketN<=25; bucketN++) myfileb << numFiles[bucketN] << "," ;
+									  	myfileb <<"\n";
+									}
+									myfileb.close();
+
+
+
 
 }
 
 int realGame()
 {
-	int NUMTRIALS = 1000000;
+	int NUMTRIALS = 5000000;
 	
 	int bucket = -1;
 	int seed = -1;
@@ -1123,7 +1185,7 @@ int realGame()
 		closedir(dir);
 		
 
-		playGame(seed, &data, blankRecord);
+		playGame(seed, &data, blankRecord, true);
 		//printf("------------------\n");
 		if (trial > 0) average = ((average*(double)trial)+(double)data.totalWins)/((double)trial+1.0) ; else average = data.totalWins;
 		//printf("%10i %f\n", data.totalWins, average);
@@ -1137,7 +1199,6 @@ int realGame()
 
 
 
-
 int main()
 {
 	//for (int i=1; i<11; i++)	farmer(1, i);
@@ -1145,10 +1206,11 @@ int main()
 	//int blankRecord[8][16] = {0};
 	
 	//gameInfo data;
-	//playGame(8, &data, blankRecord);
-	//for (int i=1; i<=10; i++)	farmer(1,i);
+	//playGame(3, &data, blankRecord);
+	///for (int i=1; i<=10; i++)	farmer(1,i);
 
-	//farmer(1,8);
+	//printf("%i\n", data.totalWins);
+	//farmer(70,31);
 	realGame();
 	//int gameBoard[NUMROWS][NUMCOLS] = {0};
 

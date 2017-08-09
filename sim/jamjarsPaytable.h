@@ -82,55 +82,38 @@ BUCKET21, ...		...	BUCKET25,
 */
 int bucketWeights[28] = 
 {
-26,13,
+26,9,
+1,
+1,1,0,0,0,
+1,1,1,0,0,
+1,0,0,0,0,
+1,1,0,0,0,
+0,0,0,0,0,
 
-10,
-1,0,0,0,0,
-1,0,0,0,0,
-1,0,0,0,0,
-0,0,0,0,0,
-0,0,0,0,0,
+
+
 };
 
 /*
 Bucket Size.
 
 Specifies the size of the buckets, ie, how many seeds are in each bucket. 
-The format is the same as the second part of the bucket weights, just there to make it easier to copy to/from Excel
-
-BUCKET0
-BUCKET1 BUCKET2 ... BUCKET5
-BUCKET6 ...		...	BUCKET9
-...
-BUCKET21 ...	...	BUCKET25
-
 */
 const int bucketSize[26] = 
 {
-4,
-3,0,0,0,0,
-2,0,0,0,0,
-1,0,0,0,0,
-0,0,0,0,0,
-0,0,0,0,0,
-
+58,28,3,0,0,0,6,1,1,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,
 
 };
 
 /*
 Bucket File Size.
 
-??
+This determines how many files are in that bucket directory. So you might well have 3 wins in a bucket, but they may all be within the same file.
 
 */
 const int bucketFileSize[26] = 
 {
-0,
-0,0,0,0,0,
-0,0,1,1,1,
-0,1,1,0,1,
-0,0,0,0,1,
-0,0,1,0,1,
+1,1,1,0,0,0,1,1,1,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,
 };
 
 /*
@@ -154,3 +137,35 @@ In the Weighted format: {NUMBER_OF_JAMS, TOTAL_WEIGHT, JAM1_WEIGHT, ... JAM6 WEI
 */
 const int jamWeights[8] = {6, 21,1,3,6,4,5,2};
 
+
+/*
+bucketDef
+
+Defines which bucket things go into.
+
+Format:
+
+0REDROPS
+BUCKET1A, BUCKET 1B .. BUCKET 1E    // 5 buckets per redrop
+BUCKET2A, BUCKET 2B .. BUCKET 2E    // 5 buckets per redrop
+...
+BUCKET6A, BUCKET 6B .. BUCKET 6E    // 5 buckets per redrop
+
+the number refers to the number of wins. 
+So, for 6 redrops, you will be in the first bucket if you have 5 or less wins, 
+the 2nd bucket if you have 6 wins, t
+he 3rd bucket if you have 7-9 wins, 
+the 4th bucket if you have 10-14
+and the 5th bucket for 15+
+
+
+*/
+int bucketDef[6][5] = 
+{
+	{0,0,0,0,0},			
+	{1,2,3,4,5},
+	{2,3,4,5,6},
+	{3,4,5,6,8},
+	{4,5,6,10,15},
+	{5,6,7,10,15},
+};
