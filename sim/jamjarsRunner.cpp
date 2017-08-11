@@ -59,6 +59,31 @@ struct gameInfo
 
  int seed = (int)time(0); 
 	 CRandomMersenne RanGen(seed); 
+int to_int(char const *s)
+{
+     if ( s == NULL || *s == '\0' )
+        throw std::invalid_argument("null or empty string argument");
+
+     bool negate = (s[0] == '-');
+     if ( *s == '+' || *s == '-' ) 
+         ++s;
+
+     if ( *s == '\0')
+        throw std::invalid_argument("sign character only.");
+
+     int result = 0;
+     while(*s)
+     {
+          if ( *s >= '0' && *s <= '9' )
+          {
+              result = result * 10  - (*s - '0');  //assume negative number
+          }
+          else
+              throw std::invalid_argument("invalid input string");
+          ++s;
+     }
+     return negate ? result : -result; //-result is positive!
+} 
 
 int weightedDice(int* dist)
 {
@@ -241,6 +266,27 @@ int gridLoc( int *vec, int i, int j)
 
 
 }
+
+int whichWinBucket(int drops, int wins)
+{
+	int bucketNum = -1;
+
+	int bu = -1;
+	for (bu=0; bu<4; bu++)
+	{
+		//printf("boundary is %i, and i have %i\n", bucketDef[drops][bu], wins);
+		if (wins >= bucketDef[drops][bu] &&  wins < bucketDef[drops][bu+1]) {
+			bucketNum = bu;
+			break;
+		}
+		
+	}
+
+	if (bucketNum==-1) bucketNum = 4;
+
+	return bucketNum;
+}
+
 
 int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, Rng *tileRng )
 {
@@ -763,39 +809,96 @@ Runs seeds and categorizes them by number of redrops and number of wins
 
   numResults: number of seeds needed
   startSeed: the seed number to begin from (may want this if you are looking for new stuff that you havent got yet and dont want to go over the old seeds)
-  redropTarget (default -1 = OFF, no target) : if you want to ignore anything but results that have this number of redrops
-  winTarget (default -1 = OFF, no target) : if you want to ignore anything but results that have this number of wins
-  
+  targetArray: use this to target certain results. The 8x16 matrix represents the symbols and the  "of a kinds". A 1 in the matrix indicates that a win of this type is needed. As long as one result is found, the seed will be used. Use a matrix full of 1s to accept any array
+  redropTarget (default -1 = OFF, no target) : if you want to ignore anything but results that are in this bucket
+  safe: if true, checks if seed already exists in the file and does not write it again if it does exist. Unsafe skips this check
+
 */
-int farmer(int numResults, int startSeed, int redropTarget=-1, int winTarget=-1)
+int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarget = -1, int safe=1)
 {
-	printf("Jam Jars Farmer\n");
+	printf("Jam Jars Farmer\n", bucketTarget);
 	ofstream myfile;
 
 	int blankRecord[8][16] = {0};
 
 	int redrops = 1;
 	int wins = 1;
+	int validSeed=0;
+	int targetHits = 0;
+	int bucket =-1;
 	 ostringstream os;
+	 int numFoundSeeds = 0;
 
 		gameInfo data;
 		int seed = -1;
 
+		printf("Looking for results in bucket %i\n", bucketTarget);
 
 	 for (int res=0; res<numResults; res++)
 	 {
+	 	validSeed=0;
+
 	 	seed = startSeed + res;
-	 	printf("Farming from seed %i\n", seed);
+	 	printf("Farming from seed %i ", seed);
 	 	playGame(seed, &data,blankRecord, false);
 
 	 	//printf("To repeat, that's %i prize over %i drops with %i wins\n", data.totalWins, data.totalDrops, data.totalNumWins);
+	 	targetHits=0;
+	 	bucket=-1;
+	 	for (int xx=0; xx<8; xx++)
+		{
+			for (int yy=0; yy<16; yy++) 
+			{
+				//printf("%i(%i)", blankRecord[xx][yy],targetArray[xx][yy] );
+				if (blankRecord[xx][yy] == 1 && targetArray[xx][yy] == 1) {targetHits++; printf ("*");}
+				blankRecord[xx][yy] = 0;
+			}
+			//printf("\n");
+				
+		}
+		printf("%i hits on target\n", targetHits);
 
 	 	redrops = data.totalDrops;
 	 	wins = data.totalNumWins;
 
+
+	 	bucket = (redrops-1)*5+whichWinBucket(redrops, wins)+1;
+
 	 	if (redrops>5) redrops = 5; //LIMIT of 5, can have as many as you like...
 
-	 	if (  (redropTarget == redrops || redropTarget == -1) &&   (winTarget == wins || winTarget == -1) )
+		if (safe)
+		{
+			validSeed = true;
+
+			os << "./output/R" << redrops << "/W" << wins << ".txt";
+			string filename = os.str();
+			ifstream myfile (filename.c_str());
+			os.str(std::string()); 
+			string line;
+
+			if (myfile.is_open())
+			 {
+			    while ( getline (myfile,line) )
+			    {
+
+					if ( to_int(line.c_str()) == seed)			     validSeed = false;
+
+			    }
+			}
+
+
+		} else validSeed = true;
+
+
+		if (targetHits==0 && bucketTarget!=-1) printf ("This had 0 hits on target! ");
+		else
+		{
+			if (!validSeed) printf ("This seed has been used before. ");
+			if (!validSeed && safe) printf ("Safe search used, ignoring seed. ");
+		}
+
+
+	 	if ( validSeed && targetHits>0 && (bucketTarget==bucket || bucketTarget==-1 || bucket==0) )
 		 {
 			os << "./output/R" << redrops << "/W" << wins << ".txt";
 			string filename = os.str();
@@ -805,9 +908,11 @@ int farmer(int numResults, int startSeed, int redropTarget=-1, int winTarget=-1)
 			if (!myfile.is_open()) 	 printf("not open yet\n");	else	myfile << seed <<"\n";
 	 		
 			myfile.close();
-		}
+			numFoundSeeds++;
+		} else printf ("Seed does not fit into set requirements. There were %i hits and it went in bucket %i (%i was the target)", targetHits, bucket, bucketTarget);
 
 		os.str(std::string()); //clear the stream for next time.
+			printf("\n");
 	}
 
 	os << "./FarmLog.txt";
@@ -815,11 +920,13 @@ int farmer(int numResults, int startSeed, int redropTarget=-1, int winTarget=-1)
 
 			myfile.open (filename.c_str(), ios::app);
 
-			if (!myfile.is_open()) 	 printf("not open yet\n");	else	myfile << startSeed << "-" << startSeed+numResults-1 << ",R" << redropTarget << ",W" << winTarget  <<"\n";
+			if (!myfile.is_open()) 	 printf("not open yet\n");	else	myfile << startSeed << "-" << startSeed+numResults-1 << ",B" << bucket << "\n";
 	 		
 			myfile.close();
 
 	os.str(std::string()); //clear the stream for next time.
+
+	printf("Found %i valid seeds\n", numFoundSeeds);
 
 }
 
@@ -831,54 +938,8 @@ int farmer(int numResults, int startSeed, int redropTarget=-1, int winTarget=-1)
 
 // }
 
-int whichWinBucket(int drops, int wins)
-{
-	int bucketNum = -1;
 
 
-
-
-	int bu = -1;
-	for (bu=0; bu<4; bu++)
-	{
-		//printf("boundary is %i, and i have %i\n", bucketDef[drops][bu], wins);
-		if (wins >= bucketDef[drops][bu] &&  wins < bucketDef[drops][bu+1]) {
-			bucketNum = bu;
-			break;
-		}
-		
-	}
-
-	if (bucketNum==-1) bucketNum = 4;
-
-	return bucketNum;
-}
-
-int to_int(char const *s)
-{
-     if ( s == NULL || *s == '\0' )
-        throw std::invalid_argument("null or empty string argument");
-
-     bool negate = (s[0] == '-');
-     if ( *s == '+' || *s == '-' ) 
-         ++s;
-
-     if ( *s == '\0')
-        throw std::invalid_argument("sign character only.");
-
-     int result = 0;
-     while(*s)
-     {
-          if ( *s >= '0' && *s <= '9' )
-          {
-              result = result * 10  - (*s - '0');  //assume negative number
-          }
-          else
-              throw std::invalid_argument("invalid input string");
-          ++s;
-     }
-     return negate ? result : -result; //-result is positive!
-} 
 
 void bucketStats()
 {
@@ -1203,15 +1264,25 @@ int main()
 {
 	//for (int i=1; i<11; i++)	farmer(1, i);
 	//bucketStats();
-	//int blankRecord[8][16] = {0};
+	int blankRecord[8][16] = {
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
+	};
 	
-	//gameInfo data;
-	//playGame(3, &data, blankRecord);
+	gameInfo data;
+	//int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJam)
+	///playGame(15041, &data, blankRecord, true);
 	///for (int i=1; i<=10; i++)	farmer(1,i);
 
 	//printf("%i\n", data.totalWins);
-	//farmer(70,31);
-	realGame();
+	farmer(10,15036, blankRecord, -1, true);
+	//realGame();
 	//int gameBoard[NUMROWS][NUMCOLS] = {0};
 
 	//Rng tileRng;
