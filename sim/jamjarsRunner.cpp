@@ -24,8 +24,23 @@
 #include <dirent.h>
 using namespace std;
 
+int seed = (int)time(0); 
+CRandomMersenne RanGen(seed); 
 
+/*
+RNG class
 
+ initialSeed - The seed that starts the RNG, important to keep this because we use this to define that game outcome. Eg, We say, this game comes from "Seed 1"
+ nextSeed - The pure form of the next seed. 
+ 
+ setSeed - sets the initial seed
+ generateNext - generates the next seed an update the nextSeed variable
+ getNext - returns the next seed
+ getNext(mod) - returns the next seed and applied modular arithmatic to it. Eg, if your seed is 12 and you getNext(10), you will get 2
+ getSeed - returns the initial seed
+ 
+
+*/
 class Rng {
 	unsigned long long initialSeed;
 	unsigned long long nextSeed;
@@ -47,18 +62,24 @@ class Rng {
 
 } ;
 
+
+//Stores the information for a game
 struct gameInfo
 	{
-		int wins;
-		int drops;
-		int numWins;
-		int totalWins;
-		int totalDrops;
-		int totalNumWins;
+		//per drop
+		int wins;			
+		int redrops;			
+		int numWins;		
+
+		//per whole game
+		int totalWins;		
+		int totalRedrops;		
+		int totalNumWins;	
 	} ;
 
- int seed = (int)time(0); 
-	 CRandomMersenne RanGen(seed); 
+
+
+//String to int
 int to_int(char const *s)
 {
      if ( s == NULL || *s == '\0' )
@@ -85,6 +106,15 @@ int to_int(char const *s)
      return negate ? result : -result; //-result is positive!
 } 
 
+
+/*
+	Uses the pRNG to chose an item from a weighted distribution
+
+	dist - the distribution of the weights.   {numberOfItems, toalWeight, item0Weight, item1Weight, ... , itemxWeight}
+
+	output: the index of the item selected.
+
+*/
 int weightedDice(int* dist)
 {
 	int pick;
@@ -100,6 +130,9 @@ int weightedDice(int* dist)
 	return pick-2;
 }
 
+/*
+	A version of weighted dice that uses the seeded RNG instead of the pRNG)
+*/
 int weightedDice(int* dist, Rng *tileRng)
 {
 	int dice = 0;
@@ -205,6 +238,11 @@ int checkSquare(int (*gameBoard)[NUMCOLS], int (*markBoard)[NUMCOLS], int x, int
 /*
 	Deletes any symbols marked, drops the remaining symbols, then fills it with new ones
 
+	gameBoard - the board you are looking at
+	clearBoard - a board of marks. Any non-zero postion in the array will clear the matching position in the gameBoard array
+	tileRNG - the seeded RNG that is being used. 
+	js - The curent permutation of jams (ie how the pattern is filled.  {js[0]  = bool saying if the jams have been permuted or not. js[1-6] = jam type 1-6  (eg js[1] = 5 means jame type 1 is jam 5, whenever you see 1, put it as 5) , }
+
 */
 int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng *tileRng, int * js)
 {
@@ -245,17 +283,11 @@ int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng
 
 	}
 	//printf ("%i %i %i %i %i ",spotsToFill[0], spotsToFill[1], spotsToFill[2], spotsToFill[3], spotsToFill[4]);
-
 	//printf(">>\n");
-
-
-
-
-
 	return 0;
 }
 
-//Makes it eay to go horizontal and vertial and diagonal, just say what way you want to go and what number you want in the sequence)
+// Helper function for the feature - Makes it eay to go horizontal and vertial and diagonal, just say what way you want to go and what number you want in the sequence)
 int gridLoc( int *vec, int i, int j)
 {
 
@@ -263,10 +295,11 @@ int gridLoc( int *vec, int i, int j)
 	if (i==1) { vec[0] = 6-j; vec[1] = j; } //BL-TR
 	if (i==2) { vec[0] = 3; vec[1] = j; } //HOR
 	if (i==3) { vec[0] = j; vec[1] = 3; } //VERT
-
-
 }
 
+/*
+	Used in farming - Determines which bucket to put a result into
+*/
 int whichWinBucket(int drops, int wins)
 {
 	int bucketNum = -1;
@@ -274,7 +307,6 @@ int whichWinBucket(int drops, int wins)
 	int bu = -1;
 	for (bu=0; bu<4; bu++)
 	{
-		//printf("boundary is %i, and i have %i\n", bucketDef[drops][bu], wins);
 		if (wins >= bucketDef[drops][bu] &&  wins < bucketDef[drops][bu+1]) {
 			bucketNum = bu;
 			break;
@@ -287,7 +319,15 @@ int whichWinBucket(int drops, int wins)
 	return bucketNum;
 }
 
+/*
+	Applies the features to the game board. DOES NOT evaluate wins. 
 
+	gameBoard - the current game board
+	featureType - the feature to be applied
+	featureFruit - ie, which jam triggered the feature
+	*tileRNG - this uses the seeded RNG to complete the feature, but doesn't nessisarily need to be, can use the pRNG if needed
+
+*/
 int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, Rng *tileRng )
 {
 	printf("FEATURE CALL. FEATURE %i FOR JAM %i \n", featureType, featureFruit);
@@ -501,6 +541,16 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 
 /*
 	Check the array for wins
+
+	state - the state of the game (not used yet, but i like having it in in case it's needed)
+	gameBoard - the current game board
+	jam - ?
+	triggers -  ?
+	tileRNG - the seededRNG
+	gameInfo - struct which stores outcome from game
+	winRecorder - an array that stores counts of the different types of wins. Its a 2d array [jamType][cluster size]
+	jamSwitcher - The curent permutation of jams (ie how the pattern is filled.  {js[0]  = bool saying if the jams have been permuted or not. js[1-6] = jam type 1-6  (eg js[1] = 5 means jame type 1 is jam 5, whenever you see 1, put it as 5) , }
+
 */
 void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rng *tileRng, gameInfo *info, int (*winRecorder)[16], int *jamSwitcher)
 {
@@ -555,7 +605,7 @@ void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rn
 	//printBoard(gameBoard);
 
 	info->wins += wins;
-	info->drops ++;
+	info->redrops ++;
 	//printf ("--------------------------------------DROP COUNTED--------------------------------------------------------------------------------\n");
 	info->numWins +=numWins;
 	
@@ -598,6 +648,9 @@ int createGame(int (*gameBoard)[NUMCOLS], Rng *tileRng)
 
 }
 
+/*
+	shuffles the game board (not currently used, this is for the shufflestar feature, can leave thsi feature out if you want, see how it fits with the rest)
+*/
 int shuffleBoard(int (*gameBoard)[NUMCOLS], Rng *tileRng )
 {
 	int numShuffles = 0;
@@ -640,7 +693,6 @@ int shuffleBoard(int (*gameBoard)[NUMCOLS], Rng *tileRng )
 }
 
 /* Change the pattern into a real game board by using the jam assignment. Jam assignment will say what jam goes into what slot */
-
 void changePattern( 	int (*gameBoard)[NUMCOLS], int *jamAssignment  )
 {
 	//printBoard	(gameBoard	);
@@ -666,7 +718,7 @@ void assignJam(int* whichJam)
 
 	for (int i=0; i<8; i++) newWeights[i] = jamWeights[i];
 
-//for (int i=0; i<8; i++) printf("%i, ", newWeights[i]);
+		//for (int i=0; i<8; i++) printf("%i, ", newWeights[i]);
 		//	printf("\n");
 		
 		//printf("lets begin \n");
@@ -689,6 +741,16 @@ void assignJam(int* whichJam)
 	//printf("\n");
 
 }
+
+/*
+	playGame - plays the game
+
+	gameSeed - the seed of the game
+	data - the gameInfo struct to store information about the game
+	winRecorded - record the stats of the number of wins of each type [jamType][clusterLength]
+	dynamicJam - boolean. For farming we don't want dynamic jam, we want it always to be the same so we can accurately record the wins. For when playing, we need it to be true
+
+*/
 
 int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJam)
 {
@@ -719,10 +781,10 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJ
 
 
 	data->wins=0;
-	data->drops = 0;
+	data->redrops = 0;
 	data->numWins = 0;
 	data->totalWins = 0;
-	data->totalDrops = 0;
+	data->totalRedrops = 0;
 	data->totalNumWins = 0;
 
 	int gameOver = 0;
@@ -755,12 +817,12 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJ
 	}
 
 	data->totalWins += data->wins;
-	data->totalDrops += data->drops;
+	data->totalRedrops += data->redrops;
 
-	//printf ("...................................End of this set of drops. Won %i in %i drops\n", data->wins, data->drops);
+	//printf ("...................................End of this set of drops. Won %i in %i drops\n", data->wins, data->redrops);
 
 	data->wins = 0;
-	data->drops = 0;
+	data->redrops = 0;
 	
 	jamCheck = 6;
 	featureChoice = FEATURE_FRUITBURST; //TO DO - ADD SELECTION
@@ -795,10 +857,10 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJ
 	//need to keep going, but remember that you can't call the feature again or it will do its thing, you need to check the rest of the game as if its a normal game after this. 
 	
 
-	data->totalDrops--;
+	data->totalRedrops--;
 
 
-	//printf ("...................................End of game. Won %i over %i wins in %i drops\n", data->totalWins, data->totalNumWins, data->totalDrops);
+	//printf ("...................................End of game. Won %i over %i wins in %i drops\n", data->totalWins, data->totalNumWins, data->totalRedrops);
 	
 
 }
@@ -842,7 +904,7 @@ int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarg
 	 	printf("Farming from seed %i ", seed);
 	 	playGame(seed, &data,blankRecord, false);
 
-	 	//printf("To repeat, that's %i prize over %i drops with %i wins\n", data.totalWins, data.totalDrops, data.totalNumWins);
+	 	//printf("To repeat, that's %i prize over %i drops with %i wins\n", data.totalWins, data.totalRedrops, data.totalNumWins);
 	 	targetHits=0;
 	 	bucket=-1;
 	 	for (int xx=0; xx<8; xx++)
@@ -858,7 +920,7 @@ int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarg
 		}
 		printf("%i hits on target\n", targetHits);
 
-	 	redrops = data.totalDrops;
+	 	redrops = data.totalRedrops;
 	 	wins = data.totalNumWins;
 
 
@@ -931,16 +993,11 @@ int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarg
 }
 
 
-// void whichWinFile(int bucketNum, int *result)
-// {
-// 	int drops = bucketNum/5;
-// 	int wins = 
 
-// }
-
-
-
-
+/*
+	outputs a file that lists the statistics for each bucket, used to put into excel.
+	each bucket has an array [jamType][cluster length] which shows the counts for each win type in the buckets
+*/
 void bucketStats()
 {
 
@@ -1018,7 +1075,7 @@ void bucketStats()
 								      playGame(gameSeed, &data, stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1], false);
 
 								
-								      printf ("END. Won %i over %i wins in %i drops\n", data.totalWins, data.totalNumWins, data.totalDrops);
+								      printf ("END. Won %i over %i wins in %i drops\n", data.totalWins, data.totalNumWins, data.totalRedrops);
 	
 								    }
 								    	printf("%i seeds in this bucket\n", numSeeds);
@@ -1148,6 +1205,9 @@ void bucketStats()
 
 }
 
+/*
+	play the game with random seeds
+*/
 int realGame()
 {
 	int NUMTRIALS = 5000000;
@@ -1262,37 +1322,32 @@ int realGame()
 
 int main()
 {
-	//for (int i=1; i<11; i++)	farmer(1, i);
+
+	//Farm the results 
+
+	// int target[8][16] = {
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+	// };
+
+	//       //number of fresults, starting seed, target, specify bucket, safe search
+	// farmer(100,1, target, -1, true);
+
+
+	//Get the statistics
+
 	//bucketStats();
-	int blankRecord[8][16] = {
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1},
-	};
-	
-	gameInfo data;
-	//int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJam)
-	///playGame(15041, &data, blankRecord, true);
-	///for (int i=1; i<=10; i++)	farmer(1,i);
+		
 
-	//printf("%i\n", data.totalWins);
-	farmer(10,15036, blankRecord, -1, true);
-	//realGame();
-	//int gameBoard[NUMROWS][NUMCOLS] = {0};
+	//Real Game
 
-	//Rng tileRng;
-	//tileRng.setSeed(1);
+	realGame();
 
-	//createGame	(gameBoard, &tileRng	);
-
-	
-
-	//realGame();
-	//printf("You belong in %i\n", data.totalDrops);
 
 }
