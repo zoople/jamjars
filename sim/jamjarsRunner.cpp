@@ -288,13 +288,13 @@ int deleteAndPopulate(int (*gameBoard)[NUMCOLS], int (*clearBoard)[NUMCOLS], Rng
 }
 
 // Helper function for the feature - Makes it eay to go horizontal and vertial and diagonal, just say what way you want to go and what number you want in the sequence)
-int gridLoc( int *vec, int i, int j)
+int gridLoc( int *vec, int dir, int n)
 {
 
-	if (i==0) { vec[0] = j; vec[1] = j; } //TL-BR
-	if (i==1) { vec[0] = 6-j; vec[1] = j; } //BL-TR
-	if (i==2) { vec[0] = 3; vec[1] = j; } //HOR
-	if (i==3) { vec[0] = j; vec[1] = 3; } //VERT
+	if (dir==0) { vec[0] = n; vec[1] = n; } //TL-BR
+	if (dir==1) { vec[0] = 6-n; vec[1] = n; } //BL-TR
+	if (dir==2) { vec[0] = 3; vec[1] = n; } //HOR
+	if (dir==3) { vec[0] = n; vec[1] = 3; } //VERT
 }
 
 /*
@@ -544,8 +544,8 @@ int applyFeature( int (*gameBoard)[NUMCOLS], int featureType, int featureFruit, 
 
 	state - the state of the game (not used yet, but i like having it in in case it's needed)
 	gameBoard - the current game board
-	jam - ?
-	triggers -  ?
+	jam - current jam collection
+	triggers -  the limit of when jam is full
 	tileRNG - the seededRNG
 	gameInfo - struct which stores outcome from game
 	winRecorder - an array that stores counts of the different types of wins. Its a 2d array [jamType][cluster size]
@@ -582,7 +582,7 @@ void checkGame(int state, int (*gameBoard)[NUMCOLS], int *jam, int *triggers, Rn
 				//printf("checking: (%i, %i) %i, %i\n", x,y,winStarts[numWins][0], winStarts[numWins][1]);
 				 numWins++; 
 				 wins += paytable[gameBoard[x][y]][clusterLength]; //award the win
-				 //printf ("PAY OF %i \n", paytable[gameBoard[x][y]][clusterLength]);
+				 //printf ("PAY OF %i from %i of a kind %i \n", paytable[gameBoard[x][y]][clusterLength], clusterLength, gameBoard[x][y]);
 				 winRecorder[gameBoard[x][y]][clusterLength]++;
 				
 			}
@@ -748,11 +748,14 @@ void assignJam(int* whichJam)
 	gameSeed - the seed of the game
 	data - the gameInfo struct to store information about the game
 	winRecorded - record the stats of the number of wins of each type [jamType][clusterLength]
+	jam - storing of jams
+	jamTriggerSwitch - stores if there are any jam triggers
+	playFeatre - boolean. determines if you apply the feature if the jam jar is full.
 	dynamicJam - boolean. For farming we don't want dynamic jam, we want it always to be the same so we can accurately record the wins. For when playing, we need it to be true
 
 */
 
-int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJam)
+int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], int* jam, int* jamTriggerSwitch, bool playFeature, bool dynamicJam)
 {
 	int gameBoard[NUMROWS][NUMCOLS] = {0};
 	Rng tileRng;
@@ -760,8 +763,8 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJ
 	int numWins = 0;
 
 	int whichJam[6] = {0};
-	int jam[7] = {0};
-	int jamTriggerSwitch[7] = {0};
+	//int jam[7] = {0};
+	//int jamTriggerSwitch[7] = {0};
 	//I int jamTriggers[7] = {0, 20, 20, 20, 20, 20, 20};
 	int jamCheck = 0;
 	int featureChoice = 0;
@@ -789,7 +792,7 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJ
 
 	int gameOver = 0;
 
-	jam[2] +=100;
+
 	
 	while (!gameOver)
 	{
@@ -803,11 +806,16 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJ
 		//printf ("%i won\n", data->wins);
 		//printf ("%i total number wins\n", data->numWins);
 		
-		//for (int i=0; i<7; i++) printf ("%i, ", jam[i]);
-		//		printf("\n");
+		// if (data->numWins > 0)
+		// {
+		// printf("Jam: ");
+		// for (int i=0; i<7; i++) printf ("%i, ", jam[i]);
+		// 		printf("\n");
 	
-		//for (int i=0; i<7; i++) printf ("%i, ", jamTriggerSwitch[i]);
-		//printf("\n");
+		// printf("Jam Trigger : ");
+		// for (int i=0; i<7; i++) printf ("%i, ", jamTriggerSwitch[i]);
+		// printf("\n");
+		// }
 		//data.wins += numWins;
 		//data.drops ++;
 		//if (data->drops > 100) numWins = 0;
@@ -827,7 +835,7 @@ int playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], bool dynamicJ
 	jamCheck = 6;
 	featureChoice = FEATURE_FRUITBURST; //TO DO - ADD SELECTION
 
-	jamTriggerSwitch[0] = 0; //DEBUG - FEATURE OFF
+	if (!playFeature) jamTriggerSwitch[0] = 0; 
 
 	if (jamTriggerSwitch[0] > 0)
 	{
@@ -874,9 +882,10 @@ Runs seeds and categorizes them by number of redrops and number of wins
   targetArray: use this to target certain results. The 8x16 matrix represents the symbols and the  "of a kinds". A 1 in the matrix indicates that a win of this type is needed. As long as one result is found, the seed will be used. Use a matrix full of 1s to accept any array
   redropTarget (default -1 = OFF, no target) : if you want to ignore anything but results that are in this bucket
   safe: if true, checks if seed already exists in the file and does not write it again if it does exist. Unsafe skips this check
+  farmZero: if set to 1, the farmer will categorize zero wins. 
 
 */
-int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarget = -1, int safe=1)
+int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarget = -1, int safe=1, int farmZero = 1)
 {
 	printf("Jam Jars Farmer\n", bucketTarget);
 	ofstream myfile;
@@ -891,10 +900,14 @@ int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarg
 	 ostringstream os;
 	 int numFoundSeeds = 0;
 
+	int jam[7] = {0};
+	int jamTriggerSwitch[7] = {0};
+
+
 		gameInfo data;
 		int seed = -1;
 
-		printf("Looking for results in bucket %i\n", bucketTarget);
+		if (bucketTarget !=1) printf("Looking for results in bucket %i\n", bucketTarget);
 
 	 for (int res=0; res<numResults; res++)
 	 {
@@ -902,9 +915,11 @@ int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarg
 
 	 	seed = startSeed + res;
 	 	printf("Farming from seed %i ", seed);
-	 	playGame(seed, &data,blankRecord, false);
 
-	 	//printf("To repeat, that's %i prize over %i drops with %i wins\n", data.totalWins, data.totalRedrops, data.totalNumWins);
+	 	//playGame(int gameSeed, gameInfo* data, int (*winRecorder)[16], int* jam, int* jamTriggerSwitch, bool dynamicJam)
+	 	playGame(seed, &data, blankRecord, jam, jamTriggerSwitch, false, false);
+	 	printf("Game Complete: %i prize over %i drops with %i wins\n", data.totalWins, data.totalRedrops, data.totalNumWins);
+	 	
 	 	targetHits=0;
 	 	bucket=-1;
 	 	for (int xx=0; xx<8; xx++)
@@ -919,6 +934,7 @@ int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarg
 				
 		}
 		printf("%i hits on target\n", targetHits);
+		if (targetHits == 0 && farmZero == 1) {printf ("But you are ok with zeroes so, counting it\n"); targetHits=1;}
 
 	 	redrops = data.totalRedrops;
 	 	wins = data.totalNumWins;
@@ -937,30 +953,28 @@ int farmer(int numResults, int startSeed, int (*targetArray)[16], int bucketTarg
 			ifstream myfile (filename.c_str());
 			os.str(std::string()); 
 			string line;
-
+			printf("Checking %s: \n", filename.c_str());
 			if (myfile.is_open())
 			 {
 			    while ( getline (myfile,line) )
 			    {
 
 					if ( to_int(line.c_str()) == seed)			     validSeed = false;
-
+					printf("%s, ", line.c_str());
 			    }
 			}
-
+			printf("\n");
+			myfile.close();
 
 		} else validSeed = true;
 
 
-		if (targetHits==0 && bucketTarget!=-1) printf ("This had 0 hits on target! ");
-		else
-		{
-			if (!validSeed) printf ("This seed has been used before. ");
-			if (!validSeed && safe) printf ("Safe search used, ignoring seed. ");
-		}
+		if (!validSeed) printf ("This seed has been used before. ");
+		if (!validSeed && safe) printf ("Safe search used, ignoring seed. ");
+		
 
 
-	 	if ( validSeed && targetHits>0 && (bucketTarget==bucket || bucketTarget==-1 || bucket==0) )
+	 	if ( validSeed && targetHits>0 && (bucketTarget==bucket || bucketTarget==-1) )
 		 {
 			os << "./output/R" << redrops << "/W" << wins << ".txt";
 			string filename = os.str();
@@ -1024,6 +1038,9 @@ void bucketStats()
 	int gameSeed = 0;
 
 		gameInfo data;
+
+		int jam[7] = {0};
+	int jamTriggerSwitch[7] = {0};
 	
 	if ((dir = opendir ("./output")) != NULL) 
 	{
@@ -1072,7 +1089,7 @@ void bucketStats()
 								      gameSeed = to_int(line.c_str());
 								      printf("Seed: %i\n", gameSeed);
 								      numSeeds++;
-								      playGame(gameSeed, &data, stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1], false);
+								      playGame(gameSeed, &data, stats[(ent->d_name[1]-'0'-1)*5+bucketNum+1], jam, jamTriggerSwitch, false, false);
 
 								
 								      printf ("END. Won %i over %i wins in %i drops\n", data.totalWins, data.totalNumWins, data.totalRedrops);
@@ -1210,7 +1227,7 @@ void bucketStats()
 */
 int realGame()
 {
-	int NUMTRIALS = 5000000;
+	int NUMTRIALS = 5;
 	
 	int bucket = -1;
 	int seed = -1;
@@ -1224,7 +1241,9 @@ int realGame()
 	
 	struct dirent *ent;
 	struct dirent *subent;
-	int jams[6] = {0};
+
+	int jam[7] = {0};
+	int jamTriggerSwitch[7] = {0};
 
 	ostringstream os;
 	string filename;
@@ -1237,7 +1256,7 @@ int realGame()
 
 	printf("Real thing\n");
 
-	for (int trial = 0; trial < NUMTRIALS; trial++)
+	for (int trial = 0; trial < NUMTRIALS; trial++) 
 	{
 	 	//Pick a buckets
 	 	bucket = weightedDice(bucketWeights);
@@ -1306,7 +1325,7 @@ int realGame()
 		closedir(dir);
 		
 
-		playGame(seed, &data, blankRecord, true);
+		playGame(seed, &data, blankRecord, jam, jamTriggerSwitch, false, true);
 		//printf("------------------\n");
 		if (trial > 0) average = ((average*(double)trial)+(double)data.totalWins)/((double)trial+1.0) ; else average = data.totalWins;
 		//printf("%10i %f\n", data.totalWins, average);
@@ -1336,8 +1355,8 @@ int main()
 	// 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
 	// };
 
-	//       //number of fresults, starting seed, target, specify bucket, safe search
-	// farmer(100,1, target, -1, true);
+	// // // //       //number of results, starting seed, target array, specify bucket, safe search. farm zeroes
+	//    farmer(100,1, target, -1, true,true );
 
 
 	//Get the statistics
